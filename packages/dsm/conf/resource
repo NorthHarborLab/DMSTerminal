@@ -1,0 +1,15 @@
+{
+  "web-config": {
+    "nginx-static-config": {
+      "enable": [
+        {
+          "type": "dsm",
+          "relpath": "nginx/dsm-terminal.conf",
+          "alias": [
+            "dsm-terminal"
+          ]
+        }
+      ]
+    }
+  }
+}

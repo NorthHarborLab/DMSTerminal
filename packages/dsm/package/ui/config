@@ -1,0 +1,12 @@
+{
+  ".url": {
+    "org.dsmterminal.App": {
+      "type": "url",
+      "icon": "images/dsm-terminal_{0}.png",
+      "title": "DSM Terminal",
+      "desc": "Secure Web SSH terminal",
+      "url": "3rdparty/DSMTerminal/",
+      "allUsers": false
+    }
+  }
+}

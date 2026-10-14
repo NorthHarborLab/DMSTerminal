@@ -1,0 +1,149 @@
+#!/bin/sh
+
+PACKAGE_NAME="DSMTerminal"
+PACKAGE_ROOT="${SYNOPKG_PKGDEST:-/var/packages/${PACKAGE_NAME}/target}"
+PACKAGE_VAR="${SYNOPKG_PKGVAR:-/var/packages/${PACKAGE_NAME}/var}"
+PACKAGE_HOME="${SYNOPKG_PKGHOME:-/var/packages/${PACKAGE_NAME}/home}"
+PID_FILE="${PACKAGE_VAR}/dsm-terminal.pid"
+LOG_FILE="${PACKAGE_VAR}/dsm-terminal.log"
+SERVER_ENTRY="${PACKAGE_ROOT}/server/dist/index.js"
+
+write_message() {
+  if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+    printf '%s\n' "$1" > "${SYNOPKG_TEMP_LOGFILE}"
+  fi
+  printf '%s\n' "$1"
+}
+
+find_node() {
+  for candidate in \
+    /var/packages/Node.js_v22/target/usr/local/bin/node \
+    /var/packages/Node.js_v22/target/bin/node
+  do
+    if [ -x "${candidate}" ]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+is_running() {
+  [ -f "${PID_FILE}" ] || return 1
+  pid="$(cat "${PID_FILE}" 2>/dev/null)"
+  [ -n "${pid}" ] || return 1
+  kill -0 "${pid}" 2>/dev/null || return 1
+  [ -r "/proc/${pid}/cmdline" ] || return 0
+  tr '\000' ' ' < "/proc/${pid}/cmdline" | grep -F "${SERVER_ENTRY}" >/dev/null 2>&1
+}
+
+prestart() {
+  node_binary="$(find_node)" || {
+    write_message "Node.js v22 was not found. Install the official Node.js v22 package first."
+    return 1
+  }
+  node_major="$("${node_binary}" -p 'process.versions.node.split(".")[0]' 2>/dev/null)"
+  if [ -z "${node_major}" ] || [ "${node_major}" -ne 22 ]; then
+    write_message "DSM Terminal requires the official Node.js v22 package."
+    return 1
+  fi
+  if [ ! -f "${SERVER_ENTRY}" ]; then
+    write_message "DSM Terminal server files are missing. Reinstall the package."
+    return 1
+  fi
+  return 0
+}
+
+start_service() {
+  if is_running; then
+    return 0
+  fi
+
+  prestart || return 1
+  node_binary="$(find_node)" || return 1
+  mkdir -p "${PACKAGE_VAR}" "${PACKAGE_HOME}"
+  umask 077
+
+  # Keep the administrator's access configuration across upgrades, never source it as shell code
+  if [ ! -e "${PACKAGE_VAR}/access.json" ]; then
+    cp "${PACKAGE_ROOT}/config/access.json" "${PACKAGE_VAR}/access.json" || {
+      write_message "DSM Terminal access configuration could not be initialized."
+      return 1
+    }
+    chmod 600 "${PACKAGE_VAR}/access.json" || return 1
+  fi
+
+  if [ -f "${LOG_FILE}" ] && [ "$(wc -c < "${LOG_FILE}")" -gt 5242880 ]; then
+    mv -f "${LOG_FILE}" "${LOG_FILE}.1"
+  fi
+
+  cd "${PACKAGE_ROOT}/server" || return 1
+  HOME="${PACKAGE_HOME}" \
+  HOST="127.0.0.1" \
+  PORT="46880" \
+  NODE_ENV="production" \
+  DSM_TERMINAL_DATA="${PACKAGE_VAR}/profiles.json" \
+  DSM_TERMINAL_WEB="${PACKAGE_ROOT}/web" \
+  DSM_TERMINAL_AUTH_MODE="dsm-cgi" \
+  DSM_TERMINAL_ACCESS_CONFIG="${PACKAGE_VAR}/access.json" \
+  nohup "${node_binary}" "${SERVER_ENTRY}" >> "${LOG_FILE}" 2>&1 &
+  pid=$!
+  printf '%s\n' "${pid}" > "${PID_FILE}"
+
+  sleep 2
+  if ! is_running; then
+    rm -f "${PID_FILE}"
+    write_message "DSM Terminal failed to start. Check ${LOG_FILE}."
+    return 1
+  fi
+  return 0
+}
+
+stop_service() {
+  if ! is_running; then
+    rm -f "${PID_FILE}"
+    return 0
+  fi
+
+  pid="$(cat "${PID_FILE}")"
+  kill "${pid}" 2>/dev/null || true
+  attempts=0
+  while kill -0 "${pid}" 2>/dev/null && [ "${attempts}" -lt 20 ]; do
+    sleep 1
+    attempts=$((attempts + 1))
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${PID_FILE}"
+  return 0
+}
+
+case "${1:-}" in
+  prestart)
+    prestart
+    ;;
+  prestop)
+    exit 0
+    ;;
+  start)
+    start_service
+    ;;
+  stop)
+    stop_service
+    ;;
+  status)
+    if is_running; then
+      exit 0
+    fi
+    if [ -f "${PID_FILE}" ]; then
+      exit 1
+    fi
+    exit 3
+    ;;
+  *)
+    write_message "Usage: $0 {prestart|prestop|start|stop|status}"
+    exit 1
+    ;;
+esac
