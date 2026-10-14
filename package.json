@@ -9,11 +9,13 @@
   },
   "scripts": {
     "check:publication": "node scripts/check-publication.mjs",
+    "check:release": "node scripts/check-release.mjs",
     "dev": "concurrently -k -n server,web -c blue,green \"pnpm --filter @dsm-terminal/server dev\" \"pnpm --filter @dsm-terminal/web dev\"",
     "build": "pnpm -r build",
     "package:spk": "node packages/dsm/run-build-spk.mjs",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm build && pnpm --filter @dsm-terminal/server test",
+    "test": "pnpm build && pnpm --filter @dsm-terminal/server test && pnpm test:release",
+    "test:release": "node --test scripts/test/*.test.mjs",
     "start": "pnpm --filter @dsm-terminal/server start"
   },
   "devDependencies": {

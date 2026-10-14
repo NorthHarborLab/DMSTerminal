@@ -3,7 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-VERSION="${DSM_TERMINAL_VERSION:-0.2.3-0015}"
+DEFAULT_VERSION="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' "${SCRIPT_DIR}/version.json")"
+VERSION="${DSM_TERMINAL_VERSION:-${DEFAULT_VERSION}}"
+if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]{4,}$ ]]; then
+  printf 'Invalid package version.\n' >&2
+  exit 1
+fi
 VARIANT="${DSM_TERMINAL_VARIANT:-}"
 if [[ ! "${VARIANT}" =~ ^[a-z0-9-]*$ ]]; then
   printf 'Invalid package variant.\n' >&2
@@ -29,6 +34,8 @@ pnpm --filter @dsm-terminal/server --prod deploy --node-linker=hoisted --ignore-
 
 cp -a "${DEPLOY_DIR}/server/dist" "${PAYLOAD_DIR}/server/dist"
 cp -a "${DEPLOY_DIR}/server/node_modules" "${PAYLOAD_DIR}/server/node_modules"
+# ssh2 ships upstream test keys as fixtures; they are not runtime dependencies
+rm -rf "${PAYLOAD_DIR}/server/node_modules/ssh2/test"
 # pnpm installation state contains host paths and is not needed by the deployed Node runtime
 rm -f "${PAYLOAD_DIR}/server/node_modules/.modules.yaml" \
   "${PAYLOAD_DIR}/server/node_modules/.pnpm-workspace-state-v1.json"

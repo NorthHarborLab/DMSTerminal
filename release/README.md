@@ -7,7 +7,7 @@
 
 1. 在 DSM 套件中心安装群晖官方 **Node.js v22**, 版本至少 `22.22.3-1010`。新版不再使用 v20, 也不会自动升级 DSM。
 2. 打开“套件中心 → 手动安装”。
-3. 选择适配自己外部地址的 `DSM-Terminal-0.2.3-0015-apollolake.spk`; 本地定制包的文件名额外带有 `-private-`。
+3. 选择适配自己外部地址的 `DSM-Terminal-0.2.3-0016-apollolake.spk`; 本地定制包的文件名额外带有 `-private-`。
 4. DSM 会提示这是第三方未签名套件；确认文件来自本项目后继续。
 5. 启动 DSM Terminal，然后从 DSM 主菜单打开。
 
@@ -22,7 +22,7 @@
 ## 校验文件
 
 ```bash
-sha256sum -c DSM-Terminal-0.2.3-0015-apollolake.spk.sha256
+sha256sum -c DSM-Terminal-0.2.3-0016-apollolake.spk.sha256
 ```
 
 ## 出错时收集信息

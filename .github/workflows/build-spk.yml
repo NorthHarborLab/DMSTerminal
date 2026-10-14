@@ -1,0 +1,135 @@
+name: Build DSM Terminal SPK
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and package SPK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      file: ${{ steps.metadata.outputs.file }}
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
+    steps:
+      - name: Checkout source without saved credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.3
+          package-manager-cache: false
+
+      - name: Validate package version and tag
+        id: metadata
+        run: node scripts/release-info.mjs
+
+      - name: Require release tags to belong to main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Set up locked pnpm version
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          run_install: false
+
+      - name: Check source and reachable history
+        run: pnpm check:publication --history
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build and run all tests
+        run: pnpm test
+
+      - name: Build and verify generic SPK
+        env:
+          DSM_TERMINAL_VARIANT: ""
+          DSM_TERMINAL_ACCESS_CONFIG_SOURCE: ""
+        run: pnpm package:spk
+
+      - name: Check release checksum, configuration and privacy
+        run: pnpm check:release
+
+      - name: Upload only generic SPK and checksum
+        id: artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dsm-terminal-spk-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release/${{ steps.metadata.outputs.file }}
+            release/${{ steps.metadata.outputs.file }}.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    name: Publish test release
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download this run's verified artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: release
+
+      - name: Verify artifact and publish without overwriting a release
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          SPK_FILE: ${{ needs.build.outputs.file }}
+          RELEASE_NOTES: |
+            自动构建的 DSM Terminal 测试版, 适用于 apollolake / x86_64。
+
+            需要 DSM 7.2 和官方 Node.js v22 >= 22.22.3-1010。
+            此通用包仅包含示例地址 https://nas.example.com, 部署前需按 docs/EXTERNAL_ACCESS.md 配置实际访问地址。
+            不包含私人部署地址、账号、密钥或运行数据。
+            真实 DSM 安装、认证助手权限和双用户隔离仍待验收, 不代表生产安全发布批准。
+            安装前请下载 .sha256 文件并校验 SPK; 部署前阅读 README、SECURITY.md 和 release/README.md。
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFile, readdir } from 'node:fs/promises';
+          const { RELEASE_TAG: tag, SPK_FILE: file } = process.env;
+          assert.match(tag, /^v\d+\.\d+\.\d+-\d{4,}$/);
+          assert.equal(file, `DSM-Terminal-${tag.slice(1)}-apollolake.spk`);
+          assert.deepEqual((await readdir('.')).sort(), [file, `${file}.sha256`].sort());
+          const digest = createHash('sha256').update(await readFile(file)).digest('hex');
+          const checksum = await readFile(`${file}.sha256`, 'utf8');
+          assert.ok(checksum === `${digest}  ${file}\n` || checksum === `${digest} *${file}\n`);
+          NODE
+          test "$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq '.sha')" = "$SOURCE_SHA"
+          gh release create "$RELEASE_TAG" "$SPK_FILE" "$SPK_FILE.sha256" \
+            --verify-tag --target "$SOURCE_SHA" --draft --prerelease --latest=false \
+            --title "DSM Terminal $RELEASE_TAG (测试版)" --notes "$RELEASE_NOTES"
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false

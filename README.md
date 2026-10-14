@@ -66,7 +66,9 @@ pnpm test
 pnpm package:spk
 ```
 
-产物位于 `release/DSM-Terminal-0.2.3-0015-apollolake.spk`。套件依赖群晖官方 Node.js v22 (`22.22.3-1010` 或更高), 后端只监听 `127.0.0.1:46880`, 通过 DSM 官方第三方应用路径 `/3rdparty/DSMTerminal/` 访问。仅精确的应用会话交换路径向后端转交 DSM Cookie 和 SynoToken, 其余套件代理路径清除它们。后端执行固定路径的 DSM 官方认证助手, 仅使用助手验证得到的用户名和系统 UID 建立应用身份, 不再接受外部认证完成回调。真实 NAS 上套件用户执行该助手的权限与环境仍待验收。
+产物位于 `release/DSM-Terminal-0.2.3-0016-apollolake.spk`。套件依赖群晖官方 Node.js v22 (`22.22.3-1010` 或更高), 后端只监听 `127.0.0.1:46880`, 通过 DSM 官方第三方应用路径 `/3rdparty/DSMTerminal/` 访问。仅精确的应用会话交换路径向后端转交 DSM Cookie 和 SynoToken, 其余套件代理路径清除它们。后端执行固定路径的 DSM 官方认证助手, 仅使用助手验证得到的用户名和系统 UID 建立应用身份, 不再接受外部认证完成回调。真实 NAS 上套件用户执行该助手的权限与环境仍待验收。
+
+自动测试、构建及测试版 Release 由 [GitHub Actions 工作流](docs/BUILD_RELEASE.md) 完成。推送 main 或 PR 自动生成通用 SPK; 推送与 `packages/dsm/version.json` 一致的版本标签后发布预发布版本。私人定制配置不参与 Actions 构建。
 
 `0014` 增加外部访问地址配置, 公开源码使用示例 `https://nas.example.com`, 部署前需替换或从本地配置构建, 修复 HTTPS 外层代理转至 DSM HTTP 5000 后浏览器模块被误拒绝的问题。配置保存在套件数据目录 `access.json`, 升级不覆盖。仍严格拒绝其他 Origin, 不信任任意转发头来放宽检查; 参见 [外部访问配置](docs/EXTERNAL_ACCESS.md)。
 
