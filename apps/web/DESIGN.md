@@ -224,6 +224,6 @@ DSM Terminal 继承紧凑服务器侧栏、终端标签和深色面板, 使用�
 - Don't 为单个面板固定另一套主题色或改变主题间的组件几何
 - Don't 把保存凭据默认设为勾选, 或回显已经保存的密码与私钥
 - Don't 把浏览器下载描述成已有上传式进度条的内部传输队列
-- Don't 把测试截图中的棋盘格当作品牌插画或产品背景
+- Don't 将预览示例或测试占位图作为产品背景
 
-提取依据: `src/styles.css`、`src/themes.ts`、`src/App.tsx`、`src/FilePane.tsx`、`src/TerminalPane.tsx`、主题/连接/服务器/凭据组件与 `useDialog.ts`; 对照 `.impeccable/review/` 的桌面详情、缩略图、浅色、手机文件与手机主题截图。棋盘格只用于预览测试。
+实现参考: `src/styles.css`、`src/themes.ts`、`src/App.tsx`、`src/FilePane.tsx`、`src/TerminalPane.tsx`、主题/连接/服务器/凭据组件与 `useDialog.ts`。

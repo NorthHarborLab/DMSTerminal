@@ -113,7 +113,7 @@ jobs:
             需要 DSM 7.2 和官方 Node.js v22 >= 22.22.3-1010。
             此通用包仅包含示例地址 https://nas.example.com, 部署前需按 docs/EXTERNAL_ACCESS.md 配置实际访问地址。
             不包含私人部署地址、账号、密钥或运行数据。
-            真实 DSM 安装、认证助手权限和双用户隔离仍待验收, 不代表生产安全发布批准。
+            升级前备份套件数据目录中的 profiles.json、credentials.key 和 access.json。
             安装前请下载 .sha256 文件并校验 SPK; 部署前阅读 README、SECURITY.md 和 release/README.md。
         run: |
           node --input-type=module <<'NODE'

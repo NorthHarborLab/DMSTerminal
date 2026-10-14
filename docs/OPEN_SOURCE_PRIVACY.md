@@ -1,43 +1,67 @@
-# 开源隐私与历史边界
+# 配置与发布隐私
 
-## 公开内容与私人定制
+## 内容分类
 
-源码、文档、测试和默认配置仅使用示例域名及测试身份。私人部署配置优先保存在仓库外, 通过 `DSM_TERMINAL_ACCESS_CONFIG_SOURCE` 指定配置文件, 仅在构建时注入临时 payload; `.local/access.json` 也受 Git 忽略规则保护。带 `-private-` 的安装包即使已通过测试也不能公开, 普通源码检查不会自动证明所有旧包和附件已脱敏。本轮私人配置、定制包及旧 Git 备份均已移至仓库外, 不随源码同步。
+源码、默认配置、文档和示例使用示例域名及演示身份。真实部署地址、账号、认证材料和运行数据保存在管理员控制的位置，不随源码或通用安装包分发。
 
-本地可以在 `.local/privacy.json` 设置 `{"forbidden":["需要排除的字符串"]}`, 供发布检查使用。此文件不得提交, 不在公开脚本中硬编码个人信息黑名单。
+以下内容不应提交或公开：
 
-也可将私人规则保存到仓库外, 用 `DSM_TERMINAL_PRIVACY_RULES` 指定绝对路径。显式指定的规则文件缺失或无效时检查失败, 不静默退回无私人规则的检查。
+- `profiles.json`、`credentials.key`、私人 `access.json` 和环境秘密。
+- 真实密码、私钥、Cookie、SynoToken、应用 bearer 及连接票据。
+- 带服务器信息、个人路径或认证材料的日志、截图和终端输出。
+- 私人定制 SPK、私人排除词文件、旧 Git 元数据和恢复备份。
 
-SPK 不携带 pnpm 的 `.modules.yaml` 或 `.pnpm-workspace-state-v1.json`, 避免分发其中的构建机目录。后端生产依赖、前端许可及项目 MIT 仍完整保留。
+`.gitignore` 用于防止误提交，不能移除已经存在于历史或云端附件中的内容。加密后的运行配置同样属于私人数据。
 
-```text
-pnpm check:publication
-pnpm check:publication --staged
-pnpm check:publication --staged --history
+## 本地定制配置
+
+将部署配置保存在仓库外，或受忽略规则保护的 `.local/` 中。构建时通过 `DSM_TERMINAL_ACCESS_CONFIG_SOURCE` 指定配置文件，并同时设置 `DSM_TERMINAL_VARIANT=private`：
+
+```bash
+DSM_TERMINAL_ACCESS_CONFIG_SOURCE=/path/to/private/access.json \
+DSM_TERMINAL_VARIANT=private pnpm package:spk
 ```
 
-脚本检查文件名、候选或暂存内容、可选的本地分支/标签/远端跟踪可达历史, 包括作者、提交者和提交正文。它结合通用秘密模式与可用的本地隐私规则, 不是对未知个人信息、编码变体或全部秘密的形式化证明。没有本地规则的其他克隆只能执行通用检查。
+配置仅注入临时打包目录，不修改源码默认值。生成的私人包不得上传为通用附件。构建脚本不会依据配置内容自动决定包名，因此私人构建必须明确设置变体。
 
-历史改写过程中可用 `--history --ref <待验证的新提交>` 检查尚未更新到分支上的候选历史; 推送后仍须不带 `--ref` 核对全部拟公开分支、标签及远端跟踪引用。
+外部地址的格式及部署操作见 [外部访问配置](EXTERNAL_ACCESS.md)。
 
-## Git 身份与历史改写
+## 私人排除词
 
-维护者可为当前仓库配置中性项目署名与示例邮箱, 不修改其他仓库的全局设置。仅在文件中添加 mailmap 或删除最新文件不会消除旧 commit 的作者、邮箱或旧内容。
+可以在不提交的规则文件中指定需要排除的字符串：
 
-需要改写时先保留仓库外的私有恢复副本, 核对所有拟公开分支、标签和远端 SHA, 再改写对应提交的内容及作者/提交者字段。只推送经核对的分支, 用精确预期 SHA 的 force-with-lease 防止覆盖并发更新; 不把本地工具快照引用或私有备份镜像推送到 GitHub。
+```json
+{
+  "forbidden": ["需要排除的字符串"]
+}
+```
 
-历史改写会改变提交哈希。其他克隆应重新克隆或按指导重新基线化, 不要合并旧历史, 否则可能重新引入已移除的信息。
+源码检查默认读取 `.local/privacy.json`。也可以通过 `DSM_TERMINAL_PRIVACY_RULES` 指定仓库外文件，显式配置优先；文件缺失或无效时检查失败。
 
-本次最终选择重建: 先将旧 Git 元数据及恢复副本保存在仓库外的私有目录, 删除旧 GitHub 仓库, 然后建立全新的本地 Git 数据库与同名私有 GitHub 仓库。新 main 从不带父提交的匿名中文初始提交开始, 不复制旧 refs、reflog 或对象库。只上传经过隐私检查的源码, 不带旧历史、定制配置、安装包、日志和本地索引。
+```bash
+DSM_TERMINAL_PRIVACY_RULES=/path/to/private/privacy.json \
+pnpm check:publication --staged --history
 
-## GitHub 与日志检查
+DSM_TERMINAL_PRIVACY_RULES=/path/to/private/privacy.json \
+pnpm check:release
+```
 
-切换公开前独立检查 Actions 运行记录、日志、Artifacts、Releases、PR、Issue、附件和所有可见引用。源码提交不会清理这些服务端资源; 发现敏感内容时先保持私有并定位具体目标, 不进行无范围的删除。
+包检查只加载显式设置的 `DSM_TERMINAL_PRIVACY_RULES`，不会自动读取 `.local/privacy.json`。不要将私人排除词硬编码到源码或上传至 Actions 日志。
 
-本轮准备时 GitHub API 返回 Actions 运行数 0、Artifacts 0、Releases 0、PR 0、Issue 0; 因此这些集合中没有待检查的历史日志或附件。仓库可见性保持私有。私密漏洞报告入口是否可用未得到肯定确认, 使用 SECURITY.md 中说明的备用流程, 不向公开 Issue 附带敏感细节。
+## 检查范围
 
-改写分支并强制推送只能清理分支可达历史, 不能保证擦除 GitHub 按旧 SHA 保留的对象、缓存、平台审计记录、其他克隆或 Fork。GitHub 账号、仓库所有者及操作主体也不是靠匿名 Git 作者即可隐藏的信息。需要彻底清除服务器残留时应按 GitHub 官方流程联系支持并协调其他副本, 在确认前不要把“分支已脱敏”表述为“全平台已彻底删除”。[GitHub 官方历史清理说明](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
+`pnpm check:publication` 检查文件名、跟踪文件及未被忽略的候选文件；`--staged` 改为检查暂存区内容，`--history` 增加本地分支、标签和远端跟踪引用可达历史中的文件、提交作者及提交正文。`--history --ref <提交>` 可用于检查指定提交的可达历史。
 
-## 安全与开源是两项验收
+`pnpm check:release` 检查规范包名、SHA256、INFO 版本、许可、示例外部来源，以及解包后的文件路径和内容。SPK 排除 `ssh2` 测试密钥夹具与 pnpm 主机安装状态文件，保留运行依赖和第三方许可。
 
-MIT 与第三方声明见根目录 LICENSE 和 THIRD_PARTY_NOTICES.md。公开实验源码不等于批准生产部署; 真实 DSM 身份验证、升级与双用户隔离仍按 SECURITY.md 和安全边界文档验收。修复和测试不构成零风险承诺。
+两种检查均结合常见秘密模式与可用的私人规则，不覆盖所有可能的秘密格式、个人信息或编码形式。应结合命中上下文检查产物；明确的本地示例、公开测试夹具、摘要与许可证署名不等于真实凭据。
+
+## Git 与云端记录
+
+可以为当前仓库设置中性项目署名和示例邮箱，不影响其他仓库的全局配置。检查提交正文、作者与提交者、附注标签，以及所有拟发布分支；不要镜像推送本地工具快照或私有备份引用。
+
+发现真实秘密后应先撤销或轮换，再处理文件、历史、日志和附件。需要改写历史时先保留仓库外恢复副本，协调其他克隆，并使用精确的预期远端 SHA 防止覆盖并发更新。
+
+删除文件或强制推送不会自动清除平台缓存、其他克隆和 Fork。GitHub 所有者及操作账号也不会因中性 Git 署名而隐藏。服务器残留处理参见 [GitHub 历史清理说明](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)。
+
+源码检查之外，还应单独检查 Actions 日志、Artifacts、Release、Issue、PR 和附件。分发范围或可见性发生变化时，重新检查准备公开的内容。

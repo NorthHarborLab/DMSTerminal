@@ -1,10 +1,8 @@
 # 外部访问地址配置
 
-## 当前套件预设
+## 配置文件
 
-公开源码的预设外部地址为示例 `https://nas.example.com`, 应用 URL 为 `https://nas.example.com/3rdparty/DSMTerminal/`。这是文档示例, 不是可直接使用的真实 NAS 地址。部署前必须替换为自己的 HTTPS 来源, 或在构建时注入本地配置。
-
-首次启动将包内 `config/access.json` 复制到套件数据目录 `/var/packages/DSMTerminal/var/access.json` (当前机型通常对应 `/volume1/@appdata/DSMTerminal/access.json`)。已有文件不覆盖, 因此升级不会改掉管理员设置。
+DSM Terminal 使用单一 HTTPS Origin 识别允许的浏览器来源。源码和通用安装包的默认值为示例 `https://nas.example.com`，部署时需要替换为自己的地址。
 
 ```json
 {
@@ -12,30 +10,61 @@
 }
 ```
 
-此地址是严格的 HTTPS Origin, 只包含协议、主机和可选端口; 不填写应用路径、查询参数、账号密码或通配符。根目录尾斜杠与默认 443 端口会规范化。
+配置位于套件数据目录的 `access.json`，可通过 `/var/packages/DSMTerminal/var/access.json` 访问。首次启动从包内默认配置初始化，升级不覆盖已有文件。
 
-## 为什么需要它
+`externalUrl` 只填写协议、主机和可选端口，不包含应用路径、查询参数、账号密码或通配符。根路径尾斜杠与默认 443 端口会被规范化。
 
-当前部署为浏览器 HTTPS -> 外层 Nginx -> DSM HTTP 5000 -> 套件 Node。DSM 的 `$scheme` 是最后一跳 HTTP, 因此仅凭 `X-Forwarded-Proto` 推导浏览器来源会将正确的 HTTPS 模块请求拒绝为 403。
+例如，应用完整地址为 `https://nas.example.com/3rdparty/DSMTerminal/` 时，配置仍填写 `https://nas.example.com`。
 
-配置存在时, HTTP 请求的 Origin 必须与配置规范化后的来源完全一致, 不再由最后一跳协议推导允许来源。DSM 认证助手的外部 HTTPS 环境也由这项可信配置确定, 而非调用者提供的转发头。不同域名、HTTP 来源、未配置端口和 `Origin: null` 仍被拒绝。此配置不提供 CORS 放行, 也不替代 DSM 身份验证、bearer token、用户隔离或一次性票据。
+## 修改地址
 
-无 Origin 的服务端/健康检查请求仍可访问公开页面和 health, 但受保护 API 仍要求应用 bearer。WebSocket 仍要求有效一次性终端票据。此配置不会给内网 HTTP 链路加密, 不会修改外层 Nginx, 也不会关闭任何证书检查。
+1. 由具备套件数据目录权限的管理员编辑 `access.json`。
+2. 将 `externalUrl` 设置为浏览器实际使用的 HTTPS 来源。
+3. 在套件中心停止并重新启动 DSM Terminal。
+4. 从该地址登录 DSM，再通过主菜单打开应用。
 
-## 修改与故障处理
+没有网页端修改全局来源的接口。不要删除 `profiles.json` 或 `credentials.key` 来修复外部地址问题。
 
-定制包可通过进程环境 `DSM_TERMINAL_ACCESS_CONFIG_SOURCE` 指向未提交的 `.local/access.json`, 同时设置 `DSM_TERMINAL_VARIANT=private` 再执行 `pnpm package:spk`。构建只覆盖临时 payload 中的配置, 不改写公开源码默认值; 产物文件名带 `-private-`, 不得上传为公开附件。`.local/`、SPK、校验文件和运行数据均被 Git 忽略。
+配置文件缺失时按包内默认值初始化；JSON、字段或地址无效时拒绝启动，不自动允许任意来源。
 
-从旧版升级时, 套件包名和数据目录保持 `DSMTerminal`; 应用入口标识改用中性项目命名。旧桌面快捷方式如失效, 请关闭旧窗口并从 DSM 主菜单重新打开, 不要删除凭据数据来排障。
+## 反向代理
 
-由具备套件数据目录权限的管理员编辑 `access.json`, 保存后在套件中心停止并启动 DSM Terminal。没有网页端修改接口, 不允许普通 HTTP 请求改变全局信任来源。
+浏览器可以通过外层 HTTPS 代理连接到 DSM 的 HTTP 或 HTTPS 端口。应用按管理员配置的来源检查请求，不以最后一跳连接协议或任意转发头推导浏览器信任来源。
 
-例如改用 `https://nas.example.com:8443`, 必须同时在外层代理保留含端口的 Host (使用 `$http_host`, 而非丢弃端口的 `$host`), 并从该地址登录 DSM。单一外部来源配置不会同时允许两个端口或局域网 IP。
+- 保留正确的 Host；使用非默认端口时应保留 `$http_host` 中的端口。
+- WebSocket 代理需要转交 Upgrade 和 Connection，终端也支持 HTTP 事件轮询回退。
+- 从 `https://nas.example.com:8443` 访问时，配置必须包含 `:8443`。
+- 不同域名、HTTP 来源、未配置端口和 `Origin: null` 不会自动放行。
+- 单一配置不会同时允许多个域名、端口或局域网 IP。
 
-缺失配置会在套件启动时按包内预设初始化; 配置已有但 JSON、字段或 URL 无效时拒绝启动, 不降级为任意来源。修正后再启动。仅恢复外部地址配置不需要删除 `profiles.json` 或 `credentials.key`。
+这项配置不提供跨域 CORS 放行，不替代 DSM 身份认证、应用 bearer 或连接票据，也不负责加密代理之间的内部链路。TLS、证书与外层代理访问策略由部署环境管理。
 
-直接运行后端时, 可使用可信进程环境 `DSM_TERMINAL_ACCESS_CONFIG` 指定 JSON 文件, 或 `DSM_TERMINAL_EXTERNAL_URL` 指定单一 HTTPS 来源; 显式环境地址优先于文件。未提供两者时保留原来的请求协议/Host 同源检查。生产鉴权模式和开发回环限制不因外部地址配置而改变。
+无 Origin 的页面及健康检查请求仍可访问相应公开资源；受保护 API 和 WebSocket 仍需要各自的应用身份或票据。
 
-## 验证范围
+## 本地定制包
 
-回归覆盖 HTTPS Origin 经 HTTP 最后一跳加载 JS、正常替身身份交换、错误来源拒绝、配置失败关闭及 SPK 解包运行。真实 DSM 官方认证助手权限和真实用户隔离仍需 NAS 验收; 解决 JS 403 不代表全部部署验证完成。
+将真实部署配置保存到仓库外，或放在被忽略的 `.local/access.json` 中。构建时指定该文件并设置私人变体：
+
+```bash
+DSM_TERMINAL_ACCESS_CONFIG_SOURCE=/path/to/private/access.json \
+DSM_TERMINAL_VARIANT=private pnpm package:spk
+```
+
+构建只覆盖临时 payload 中的配置，不修改源码默认值。生成的包名带 `-private-`，应仅用于对应部署，不上传为通用附件。详细规则见 [配置与发布隐私](OPEN_SOURCE_PRIVACY.md)。
+
+## 直接运行后端
+
+直接运行 Node 后端时，可以通过可信进程环境配置：
+
+| 环境变量 | 用途 |
+| --- | --- |
+| `DSM_TERMINAL_ACCESS_CONFIG` | 指定外部地址 JSON 文件 |
+| `DSM_TERMINAL_EXTERNAL_URL` | 直接指定单一 HTTPS 来源，优先于文件 |
+
+均未设置时，后端按请求协议与 Host 检查同源。直接运行仍需正确选择认证模式；地址配置不改变生产鉴权或开发模式的回环限制。
+
+## 故障排查
+
+页面资源返回 403 时，先检查浏览器来源和配置是否一致，包括协议、域名及端口，再检查代理 Host 与重启后的配置。
+
+地址正确但认证失败时，另行检查 DSM 登录状态、会话交换请求和官方认证助手权限。相关命令见 [安装与故障处理](../release/README.md)。

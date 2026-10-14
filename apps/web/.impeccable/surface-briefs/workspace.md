@@ -1,6 +1,6 @@
-# Workspace extension
+# Terminal and file workspace
 
-Mode: Operate. Extend the incumbent terminal workspace for the confirmed four features
+The workspace combines server connections, interactive terminals, remote files and theme settings
 
 ## Direction contract
 
@@ -12,6 +12,6 @@ STORY: Pick a server, choose a saved or temporary credential, confirm its finger
 
 FIRST VIEWPORT: Servers at left, tabs above, terminal in the center and collapsible files at right. Files begin with path navigation and upload/new-folder actions, followed by details or thumbnails and a selected-file preview. On mobile, files become the workspace view, with servers/settings still accessible
 
-FORM: User-confirmed side-by-side extension; no seed needed for this local extension. Named interaction: select a row to reveal metadata and preview without leaving the directory
+FORM: Side-by-side terminal and file panels. Select a row to reveal metadata and preview without leaving the directory
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+CONSISTENCY: Share theme tokens, focus behavior, loading states and error feedback across the terminal, file panel and dialogs

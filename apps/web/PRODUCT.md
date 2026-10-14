@@ -10,19 +10,19 @@ Launched from Synology DSM 7.2.2, targeting DS218+ x86_64
 
 ## Users and jobs
 
-DSM administrators connect to remote SSH servers, use interactive terminals, and transfer/manage remote files through SFTP
+DSM users connect to remote SSH servers, use interactive terminals, and transfer/manage remote files through SFTP
 
 ## Stack
 
 Existing React, TypeScript, xterm.js, Express, ssh2 and pnpm workspace; distributed as a DSM SPK with official Node.js v22 (22.22.3-1010 or later)
 
-## Confirmed workflows
+## Capabilities
 
 WebSocket-first terminals with HTTP polling fallback and explicit host fingerprint verification
 
-The user requested encrypted saved password/private-key/combined credentials, configurable color themes, uploads/downloads, and file management with detail and thumbnail views
+Encrypted saved password/private-key/combined credentials, configurable color themes, uploads/downloads, and file management with detail and thumbnail views
 
-The user confirmed a file panel alongside the terminal
+A file panel alongside the terminal, with a dedicated file view on narrow screens
 
 ## Constraints
 
